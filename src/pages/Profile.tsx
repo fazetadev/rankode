@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Check, Pencil, RotateCcw } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Check, Pencil, RotateCcw, Sparkles, LogIn, LogOut } from 'lucide-react';
 import { CATEGORY_META, SUPPORTED_LANGUAGES } from '../config';
 import { CHALLENGES } from '../data/challenges';
 import {
@@ -12,8 +12,10 @@ import {
   getLanguageLabel,
 } from '../lib/format';
 import { useAppStore } from '../store/useAppStore';
+import { useT } from '../i18n/useT';
 import type { Category, Language } from '../types';
 import { Card } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -23,13 +25,18 @@ import { RankBadge } from '../components/features/RankBadge';
 import { ActivityHeatmap } from '../components/features/ActivityHeatmap';
 
 export default function Profile() {
+  const t = useT();
+  const navigate = useNavigate();
   const profile = useAppStore((s) => s.profile);
   const xp = useAppStore((s) => s.xp);
+  const activeAccountId = useAppStore((s) => s.activeAccountId);
   const solvedChallengeIds = useAppStore((s) => s.solvedChallengeIds);
   const submissions = useAppStore((s) => s.submissions);
   const activityMap = useAppStore((s) => s.activityMap);
   const updateUsername = useAppStore((s) => s.updateUsername);
   const resetDemoData = useAppStore((s) => s.resetDemoData);
+  const loadDemoData = useAppStore((s) => s.loadDemoData);
+  const logoutAccount = useAppStore((s) => s.logoutAccount);
   const addToast = useAppStore((s) => s.addToast);
 
   const [editingName, setEditingName] = useState(false);
@@ -100,14 +107,24 @@ export default function Profile() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-[#FAFAFA]">Perfil</h1>
           <p className="mt-1 text-sm text-[#A1A1AA]">
-            Estadísticas personales, actividad reciente e historial de envíos.
+            Estadísticas personales, cuenta local e historial de envíos.
           </p>
         </div>
 
-        <Button variant="danger" size="sm" onClick={() => setResetModalOpen(true)}>
-          <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
-          <span>Restablecer datos de demo</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={() => navigate('/login')}>
+            <LogIn aria-hidden="true" className="h-3.5 w-3.5" />
+            <span>{activeAccountId ? t('nav.switchAccount') : t('nav.login')}</span>
+          </Button>
+          <Button variant="secondary" size="sm" onClick={loadDemoData}>
+            <Sparkles aria-hidden="true" className="h-3.5 w-3.5 text-[#8B5CF6]" />
+            <span>Cargar datos de demo</span>
+          </Button>
+          <Button variant="danger" size="sm" onClick={() => setResetModalOpen(true)}>
+            <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+            <span>Restablecer a cero</span>
+          </Button>
+        </div>
       </header>
 
       {/* Cabecera del perfil */}
@@ -146,7 +163,7 @@ export default function Profile() {
                   </Button>
                 </form>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-lg font-semibold text-[#FAFAFA]">{profile.username}</h2>
                   <button
                     type="button"
@@ -159,6 +176,9 @@ export default function Profile() {
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
+                  <Badge variant="neutral">
+                    {activeAccountId ? t('common.demoLocal') : 'Invitado'}
+                  </Badge>
                 </div>
               )}
 
@@ -170,11 +190,17 @@ export default function Profile() {
                 </span>
                 <span aria-hidden="true">·</span>
                 <span>Miembro desde {formatDateShort(profile.joinedAt)}</span>
+                {profile.email && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="text-[#71717A]">{profile.email}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="flex gap-6 border-t border-[#27272A] pt-4 sm:border-t-0 sm:pt-0">
+          <div className="flex flex-wrap items-center gap-6 border-t border-[#27272A] pt-4 sm:border-t-0 sm:pt-0">
             <div>
               <span className="text-xs text-[#A1A1AA]">Resueltos</span>
               <p className="font-mono text-lg font-semibold tabular-nums text-[#FAFAFA]">
@@ -187,6 +213,18 @@ export default function Profile() {
                 {submissions.length}
               </p>
             </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                logoutAccount();
+                navigate('/login');
+              }}
+            >
+              <LogOut aria-hidden="true" className="h-3.5 w-3.5" />
+              <span>{t('nav.logout')}</span>
+            </Button>
           </div>
         </div>
       </Card>
@@ -274,7 +312,7 @@ export default function Profile() {
 
         {filteredSubmissions.length === 0 ? (
           <div className="p-8 text-center text-xs text-[#A1A1AA]">
-            No hay envíos registrados con estos filtros.
+            Aún no hay envíos registrados. Resuelve cualquier desafío para ver tu progreso aquí.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -336,8 +374,8 @@ export default function Profile() {
       <Modal
         open={resetModalOpen}
         onClose={() => setResetModalOpen(false)}
-        title="Restablecer datos de demo"
-        description="Se borrarán tus borradores de código, historial de envíos y XP acumulado, volviendo al estado inicial."
+        title="Restablecer progreso a cero"
+        description="Se borrarán tus borradores, historial de envíos, notas, favoritos y XP acumulado, volviendo a 0 XP."
       >
         <div className="flex justify-end gap-2">
           <Button variant="secondary" size="sm" onClick={() => setResetModalOpen(false)}>
@@ -348,7 +386,6 @@ export default function Profile() {
             size="sm"
             onClick={() => {
               resetDemoData();
-              setNameInput('tu_usuario');
               setResetModalOpen(false);
             }}
           >

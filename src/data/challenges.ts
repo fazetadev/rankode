@@ -1,6 +1,11 @@
 import type { Challenge } from '../types';
+import { EXISTING_CHALLENGES_META } from './challenges/existingEditorial';
+import { NEW_LOGIC_CHALLENGES } from './challenges/logicNew';
+import { NEW_DEBUGGING_CHALLENGES } from './challenges/debuggingNew';
+import { NEW_PROBLEM_SOLVING_CHALLENGES } from './challenges/problemSolvingNew';
+import { NEW_OPTIMIZATION_CHALLENGES } from './challenges/optimizationNew';
 
-export const CHALLENGES: Challenge[] = [
+const BASE_CHALLENGES: Challenge[] = [
   // =========================================================================
   // CATEGORÍA 1: LÓGICA (6 desafíos)
   // =========================================================================
@@ -1242,4 +1247,23 @@ export const CHALLENGES: Challenge[] = [
       ],
     },
   },
+];
+
+export const CHALLENGES: Challenge[] = [
+  ...BASE_CHALLENGES.map((challenge) => {
+    const patch = EXISTING_CHALLENGES_META[challenge.id];
+    return patch
+      ? {
+          ...challenge,
+          editorial: patch.editorial,
+          acceptanceRate: patch.acceptanceRate,
+          ...(patch.targetComplexity ? { targetComplexity: patch.targetComplexity } : {}),
+          ...(patch.perf ? { perf: patch.perf } : {}),
+        }
+      : challenge;
+  }),
+  ...NEW_LOGIC_CHALLENGES,
+  ...NEW_DEBUGGING_CHALLENGES,
+  ...NEW_PROBLEM_SOLVING_CHALLENGES,
+  ...NEW_OPTIMIZATION_CHALLENGES,
 ];

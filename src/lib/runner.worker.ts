@@ -1,11 +1,25 @@
 import type { ExecutionResult, TestCase } from '../types';
-import { buildErrorResult, executeJavaScript } from './jsRunner';
+import {
+  buildErrorResult,
+  executeCustomJavaScriptTest,
+  executeJavaScript,
+  executePerformanceTest,
+  type PerfInputPayload,
+} from './jsRunner';
 
 interface WorkerInput {
+  mode?: 'tests' | 'perf' | 'custom';
   code: string;
   entryPoint: string;
-  tests: TestCase[];
+  tests?: TestCase[];
   markHidden?: boolean;
+  perf?: PerfInputPayload;
+  custom?: {
+    args: unknown[];
+    hasExpected: boolean;
+    expected: unknown;
+    inputDisplay: string;
+  };
 }
 
 /**
@@ -17,15 +31,57 @@ self.onmessage = (event: MessageEvent<WorkerInput>) => {
   const input = event.data;
   const tests: TestCase[] = Array.isArray(input?.tests) ? input.tests : [];
   const markHidden = Boolean(input?.markHidden);
+  const code = String(input?.code ?? '');
+  const entryPoint = String(input?.entryPoint ?? '');
 
   let result: ExecutionResult;
   try {
-    result = executeJavaScript(
-      String(input?.code ?? ''),
-      String(input?.entryPoint ?? ''),
-      tests,
-      markHidden
-    );
+    if (input?.mode === 'custom' && input.custom) {
+      result = executeCustomJavaScriptTest(
+        code,
+        entryPoint,
+        input.custom.args,
+        input.custom.hasExpected,
+        input.custom.expected,
+        input.custom.inputDisplay
+      );
+    } else if (input?.mode === 'perf' && input.perf) {
+      const perfOutcome = executePerformanceTest(code, entryPoint, input.perf);
+      result = {
+        passed: perfOutcome.passed,
+        totalCount: 1,
+        passedCount: perfOutcome.passed ? 1 : 0,
+        results: [
+          {
+            id: 'perf-check',
+            passed: perfOutcome.passed,
+            inputDisplay: `Escala ${input.perf.sizeLabel}`,
+            expectedDisplay: `<= ${input.perf.maxMs} ms`,
+            actualDisplay: `${perfOutcome.durationMs} ms`,
+            durationMs: perfOutcome.durationMs,
+            error: perfOutcome.error,
+            hidden: true,
+          },
+        ],
+        logs: [],
+        runtimeMs: perfOutcome.durationMs,
+        error: perfOutcome.error,
+        simulated: false,
+        perfPassed: perfOutcome.passed,
+        perfDurationMs: perfOutcome.durationMs,
+      };
+    } else {
+      result = executeJavaScript(code, entryPoint, tests, markHidden);
+      if (result.passed && input?.perf) {
+        const perfOutcome = executePerformanceTest(code, entryPoint, input.perf);
+        result.perfPassed = perfOutcome.passed;
+        result.perfDurationMs = perfOutcome.durationMs;
+        if (!perfOutcome.passed) {
+          result.passed = false;
+          result.error = perfOutcome.error;
+        }
+      }
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result = buildErrorResult(

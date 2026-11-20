@@ -3,31 +3,37 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Code2,
+  Zap,
   Trophy,
   User,
   Award,
-  Terminal,
   Info,
+  LogIn,
 } from 'lucide-react';
 import { APP_NAME } from '../../config';
 import { getInitials } from '../../lib/format';
 import { useAppStore } from '../../store/useAppStore';
+import { useT } from '../../i18n/useT';
+import { BrandLogo } from '../ui/BrandLogo';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { XpBar } from '../features/XpBar';
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/challenges', label: 'Desafíos', icon: Code2, end: false },
-  { to: '/ranking', label: 'Ranking', icon: Trophy, end: true },
-  { to: '/profile', label: 'Perfil', icon: User, end: true },
-  { to: '/ranks', label: 'Rangos', icon: Award, end: true },
-];
-
 export function Sidebar() {
+  const t = useT();
   const profile = useAppStore((s) => s.profile);
   const xp = useAppStore((s) => s.xp);
+  const activeAccountId = useAppStore((s) => s.activeAccountId);
   const [infoOpen, setInfoOpen] = useState(false);
+
+  const navItems = [
+    { to: '/', label: t('nav.dashboard'), icon: LayoutDashboard, end: true },
+    { to: '/challenges', label: t('nav.challenges'), icon: Code2, end: false },
+    { to: '/practice', label: t('nav.practice'), icon: Zap, end: true },
+    { to: '/ranking', label: t('nav.ranking'), icon: Trophy, end: true },
+    { to: '/profile', label: t('nav.profile'), icon: User, end: true },
+    { to: '/ranks', label: t('nav.ranks'), icon: Award, end: true },
+  ];
 
   return (
     <>
@@ -35,12 +41,9 @@ export function Sidebar() {
         <div className="flex h-14 items-center justify-between border-b border-[#27272A] px-5">
           <NavLink
             to="/"
-            className="flex items-center gap-2.5 text-sm font-semibold tracking-tight text-[#FAFAFA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] rounded"
+            className="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6] rounded"
           >
-            <span className="flex h-7 w-7 items-center justify-center rounded-md border border-[#27272A] bg-[#18181B] text-[#8B5CF6]">
-              <Terminal className="h-4 w-4" />
-            </span>
-            <span>{APP_NAME}</span>
+            <BrandLogo />
           </NavLink>
           <button
             type="button"
@@ -53,7 +56,7 @@ export function Sidebar() {
         </div>
 
         <nav aria-label="Navegación principal" className="flex-1 space-y-1 px-3 py-4">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -84,7 +87,7 @@ export function Sidebar() {
           })}
         </nav>
 
-        <div className="border-t border-[#27272A] p-3">
+        <div className="space-y-2 border-t border-[#27272A] p-3">
           <NavLink
             to="/profile"
             className="block rounded-lg border border-[#27272A] bg-[#111113] p-3 transition-colors hover:border-[#3F3F46] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5CF6]"
@@ -97,10 +100,20 @@ export function Sidebar() {
                 <p className="truncate text-xs font-medium text-[#FAFAFA]">
                   {profile.username}
                 </p>
-                <p className="text-[11px] text-[#71717A]">Cuenta local</p>
+                <p className="text-[11px] text-[#71717A]">
+                  {activeAccountId ? t('common.demoLocal') : 'Invitado · 0 XP base'}
+                </p>
               </div>
             </div>
             <XpBar xp={xp} compact />
+          </NavLink>
+
+          <NavLink
+            to="/login"
+            className="flex items-center justify-center gap-1.5 rounded-md border border-[#27272A] bg-[#111113] px-3 py-1.5 text-xs font-medium text-[#A1A1AA] transition-colors hover:border-[#3F3F46] hover:text-[#FAFAFA]"
+          >
+            <LogIn aria-hidden="true" className="h-3.5 w-3.5 text-[#8B5CF6]" />
+            <span>{activeAccountId ? t('nav.switchAccount') : t('nav.login')}</span>
           </NavLink>
         </div>
       </aside>
@@ -124,7 +137,7 @@ export function Sidebar() {
             contenedorizado en servidor.
           </p>
           <p>
-            Tu progreso, borradores e historial se guardan únicamente en{' '}
+            Las cuentas locales, progreso, borradores e historial se guardan únicamente en{' '}
             <code className="rounded bg-[#18181B] px-1.5 py-0.5 font-mono text-xs text-[#FAFAFA]">
               localStorage
             </code>

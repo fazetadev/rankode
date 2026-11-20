@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHALLENGES } from '../data/challenges';
-import { evaluateSimulatedCode, executeJavaScriptDirect } from './judge';
+import {
+  evaluateSimulatedCode,
+  executeJavaScriptDirect,
+  executePerformanceTest,
+} from './judge';
 import type { Language } from '../types';
 
 function getChallenge(id: string) {
@@ -220,4 +224,33 @@ test('cuando el juez simulado no puede confirmar, explica que no ejecuta código
   assert.equal(res.passed, false);
   assert.equal(res.simulated, true);
   assert.match(res.error ?? '', /JavaScript/);
+});
+
+test('executePerformanceTest accepts fast O(n) code and rejects slow or wrong output', () => {
+  const challenge = getChallenge('max-subarray-kadane');
+  assert.ok(challenge.perf, 'max-subarray-kadane should define perf spec');
+
+  const ok = executePerformanceTest(
+    challenge.referenceSolution.javascript,
+    challenge.entryPoint,
+    {
+      sizeLabel: challenge.perf.sizeLabel,
+      args: challenge.perf.build(),
+      referenceCode: challenge.referenceSolution.javascript,
+      maxMs: challenge.perf.maxMs,
+    }
+  );
+  assert.equal(ok.passed, true);
+
+  const wrong = executePerformanceTest(
+    'function maxSubArray(nums) { return 0; }',
+    challenge.entryPoint,
+    {
+      sizeLabel: challenge.perf.sizeLabel,
+      args: challenge.perf.build(),
+      referenceCode: challenge.referenceSolution.javascript,
+      maxMs: challenge.perf.maxMs,
+    }
+  );
+  assert.equal(wrong.passed, false);
 });

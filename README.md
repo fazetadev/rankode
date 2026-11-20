@@ -1,100 +1,36 @@
-# Arena (Prototipo local)
+# rankode
 
-Prototipo web interactivo de una plataforma minimalista de programación competitiva construido con Vite, React, TypeScript estricto, Tailwind CSS, Zustand y CodeMirror 6. Funciona 100% en local sin backend ni llamadas a APIs externas.
+Plataforma minimalista de programación competitiva y práctica algorítmica ejecutada 100% en local.
 
-## Requisitos previos
+## Características principales
 
-- **Node.js 18+** (recomendado 20+)
-- **npm 9+**
+- **60 desafíos interactivos** en 4 categorías (`Lógica`, `Debugging`, `Resolución de problemas`, `Optimización`) y 4 niveles de dificultad (`Fácil`, `Media`, `Difícil`, `Experto`).
+- **Ejecución real de JavaScript** en Web Worker aislado con límite de 3s, captura de consola, pruebas personalizadas y pruebas de rendimiento.
+- **Juez simulado** en cliente para `Python`, `Java` y `C++` (etiquetado explícitamente como *Ejecución simulada*).
+- **Práctica rápida (`/practice`)**: 60 microejercicios en sesiones de 10 preguntas sobre salida de código, detección de bugs y complejidad temporal.
+- **Autenticación local (`Demo local`)**: registro, inicio de sesión, cambio de cuenta o acceso como invitado; toda cuenta nueva inicia desde `0 XP`.
+- **Progreso persistente en `localStorage`** (`rankode_state_v2`) con migración automática desde versiones anteriores.
 
-## Ejecución local paso a paso
+## Desarrollo y scripts
 
-1. Instalar dependencias:
-   ```bash
-   npm install
-   ```
+El servidor de desarrollo corre en el puerto **3000** (`http://localhost:3000`).
 
-2. Iniciar el servidor de desarrollo:
-   ```bash
-   npm run dev
-   ```
-   Abre [http://localhost:5173](http://localhost:5173) (o el puerto configurado por Vite en el entorno actual) en tu navegador.
-
-3. Generar compilación de producción:
-   ```bash
-   npm run build
-   ```
-
-4. Previsualizar la compilación de producción localmente:
-   ```bash
-   npm run preview
-   ```
-
-5. Verificación de tipos y tests unitarios:
-   ```bash
-   npm run lint
-   npx --yes tsx --test src/lib/xp.test.ts src/lib/challenges.test.ts
-   ```
+```bash
+npm install
+npm run dev        # Inicia Vite en el puerto 3000
+npm run build      # Compila la aplicación para producción
+npm run preview    # Previsualiza el build generado
+npm run lint       # Verifica tipos con TypeScript (tsc --noEmit)
+npm run typecheck  # Alias de verificación de tipos
+npm test           # Ejecuta los tests unitarios con tsx --test
+npm run clean      # Elimina la carpeta dist
+```
 
 ## Estructura del proyecto
 
-```text
-├── index.html
-├── package.json
-├── postcss.config.js
-├── tailwind.config.ts
-├── tsconfig.json
-├── vite.config.ts
-└── src/
-    ├── App.tsx                 # Enrutado principal y carga diferida del editor
-    ├── config.ts               # Constante única APP_NAME y metadatos de plataforma
-    ├── index.css               # Fuentes @fontsource locales y configuración Tailwind
-    ├── main.tsx
-    ├── types.ts                # Interfaces TypeScript estrictas
-    ├── components/
-    │   ├── features/           # CodeEditor, TestResults, XpBar, XpChart, Heatmap, Ranking...
-    │   ├── layout/             # Sidebar (escritorio) y MobileNav (móvil)
-    │   └── ui/                 # Button, Card, Badge, Tabs, Modal, ProgressBar, Select, Input, Toast
-    ├── data/
-    │   ├── challenges.ts       # 24 desafíos (6 por categoría) con tests y soluciones
-    │   ├── players.ts          # 50 jugadores ficticios con semilla determinista
-    │   └── seed.ts             # Estado inicial de demostración
-    ├── lib/
-    │   ├── format.ts           # Formateo de fechas, números y serialización segura
-    │   ├── judge.ts            # Interfaz Runner, orquestador Worker JS y juez simulado
-    │   ├── jsRunner.ts         # Ejecutor de JavaScript compartido (acepta `export` y `module.exports`)
-    │   ├── runner.worker.ts    # Web Worker aislado para ejecución real de JavaScript
-    │   └── xp.ts               # Funciones puras de XP, bonificaciones y rangos
-    ├── pages/
-    │   ├── Dashboard.tsx
-    │   ├── Challenges.tsx
-    │   ├── ChallengeDetail.tsx
-    │   ├── Ranking.tsx
-    │   ├── Profile.tsx
-    │   ├── Ranks.tsx
-    │   └── NotFound.tsx
-    └── store/
-        └── useAppStore.ts      # Estado global Zustand con persistencia versionada en localStorage
-```
-
-## Cómo cambiar `APP_NAME`
-
-Abre `src/config.ts` y modifica únicamente la constante `APP_NAME`:
-
-```ts
-export const APP_NAME = 'TuNuevoNombre';
-```
-
-El nombre se propaga automáticamente a la barra lateral, título e información de la plataforma. (Actualiza también `<title>` en `index.html` si deseas cambiar el título de la pestaña del navegador).
-
-## Cómo añadir un desafío nuevo
-
-1. Abre `src/data/challenges.ts` y añade un objeto al arreglo `CHALLENGES` siguiendo la interfaz `Challenge` definida en `src/types.ts`.
-2. Define `id`, `title`, `category` (`logic` | `debugging` | `problem-solving` | `optimization`), `difficulty`, `xp`, `entryPoint`, `description`, `examples`, `constraints`, `hints` (3 pistas), `starterCode`, `referenceSolution` y `tests` (`visible` y `hidden`).
-3. Ejecuta `npx --yes tsx --test src/lib/challenges.test.ts` para verificar automáticamente que tu solución de referencia en JavaScript pasa todos los casos y que las plantillas iniciales fallan como se espera.
-
-## Cómo restablecer los datos de demo
-
-1. Navega a **Perfil** (`/profile`).
-2. Pulsa **Restablecer datos de demo** en la esquina superior derecha y confirma la acción en el diálogo modal.
-3. También puedes limpiar manualmente la clave `arena_platform_state_v1` en `localStorage` desde las herramientas de desarrollo del navegador.
+- `src/components/{ui,features,layout}` — Componentes reutilizables, editor CodeMirror, barra superior y navegación.
+- `src/pages` — `Login`, `Dashboard`, `Challenges`, `ChallengeDetail`, `Practice`, `Ranking`, `Profile`, `Ranks`.
+- `src/data` — Catálogo de 60 desafíos (`challenges.ts` + `challenges/*`), 60 quizzes (`quizzes.ts`), jugadores simulados y estado inicial en cero (`seed.ts`).
+- `src/lib` — Ejecutor JS/Worker (`jsRunner.ts`, `runner.worker.ts`, `judge.ts`), sistema XP y rangos (`xp.ts`), analizador heurístico de complejidad (`complexity.ts`), racha (`streak.ts`), migración (`migration.ts`) y tests unitarios (`*.test.ts`).
+- `src/store/useAppStore.ts` — Estado global con Zustand + persistencia versionada.
+- `src/i18n` — Diccionario tipado `es`/`en` y hook `useT()`.

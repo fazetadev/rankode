@@ -1,19 +1,16 @@
 import { WORKER_TIMEOUT_MS } from '../config';
 import type { Challenge, ExecutionResult, Language, Runner, TestCase, TestCaseResult } from '../types';
-import { buildErrorResult, executeJavaScript } from './jsRunner';
+import {
+  buildErrorResult,
+  executeCustomJavaScriptTest,
+  executeJavaScript,
+  executePerformanceTest,
+  type PerfInputPayload,
+} from './jsRunner';
 
-// Reexportados para mantener compatibilidad con los tests y otros módulos.
-export { deepEqual } from './jsRunner';
-
-/**
- * Ejecuta JavaScript directamente en memoria (usado por tests unitarios o fallback).
- */
+export { deepEqual, executePerformanceTest } from './jsRunner';
 export const executeJavaScriptDirect = executeJavaScript;
 
-/**
- * Aviso que se muestra cuando el juez simulado no puede confirmar una solución.
- * Python, Java y C++ no se ejecutan de verdad en este prototipo.
- */
 const SIMULATOR_NOTE =
   'El juez simulado no ejecuta Python, Java ni C++ de verdad: compara la estructura de tu código ' +
   'con la solución esperada. Si estás seguro de que tu solución es correcta, pruébala en JavaScript, ' +
@@ -25,21 +22,11 @@ function isExecutionResult(value: unknown): value is ExecutionResult {
   return typeof candidate.passed === 'boolean' && Array.isArray(candidate.results);
 }
 
-/**
- * Ejecuta JavaScript en un Web Worker aislado con límite de 3 segundos.
- * Siempre resuelve con un ExecutionResult (nunca rechaza ni se queda colgada):
- * si el worker no carga, falla o responde algo inválido, el error se muestra en el panel.
- */
-function runJavaScriptInWorker(
-  code: string,
-  entryPoint: string,
-  tests: TestCase[],
+function runWorkerPayload(
+  payload: Record<string, unknown>,
+  fallbackTests: TestCase[],
   markHidden = false
 ): Promise<ExecutionResult> {
-  if (typeof Worker === 'undefined') {
-    return Promise.resolve(executeJavaScript(code, entryPoint, tests, markHidden));
-  }
-
   return new Promise<ExecutionResult>((resolve) => {
     let worker: Worker;
     try {
@@ -50,7 +37,7 @@ function runJavaScriptInWorker(
       const message = err instanceof Error ? err.message : String(err);
       resolve(
         buildErrorResult(
-          tests,
+          fallbackTests,
           'Error',
           `No se pudo iniciar el ejecutor de código (Web Worker): ${message}`,
           markHidden
@@ -71,8 +58,8 @@ function runJavaScriptInWorker(
     };
 
     timeoutId = window.setTimeout(() => {
-      const timeoutMsg = `Tiempo límite excedido (${WORKER_TIMEOUT_MS / 1000}s). Revisa posibles bucles infinitos.`;
-      finish(buildErrorResult(tests, 'Timeout', timeoutMsg, markHidden, [], WORKER_TIMEOUT_MS));
+      const timeoutMsg = `Tiempo límite excedido (${WORKER_TIMEOUT_MS / 1000}s). Revisa posibles bucles infinitos o complejidad demasiado alta.`;
+      finish(buildErrorResult(fallbackTests, 'Timeout', timeoutMsg, markHidden, [], WORKER_TIMEOUT_MS));
     }, WORKER_TIMEOUT_MS);
 
     worker.onmessage = (event: MessageEvent<unknown>) => {
@@ -81,7 +68,7 @@ function runJavaScriptInWorker(
       } else {
         finish(
           buildErrorResult(
-            tests,
+            fallbackTests,
             'Error',
             'El ejecutor de código devolvió una respuesta no válida.',
             markHidden
@@ -93,7 +80,7 @@ function runJavaScriptInWorker(
     worker.onmessageerror = () => {
       finish(
         buildErrorResult(
-          tests,
+          fallbackTests,
           'Error',
           'No se pudo leer el resultado enviado por el ejecutor de código.',
           markHidden
@@ -105,7 +92,7 @@ function runJavaScriptInWorker(
       event.preventDefault();
       finish(
         buildErrorResult(
-          tests,
+          fallbackTests,
           'Error',
           event.message ||
             'No se pudo cargar el ejecutor de código (Web Worker). Recarga la página con Ctrl+Shift+R o reinicia "npm run dev".',
@@ -115,12 +102,12 @@ function runJavaScriptInWorker(
     };
 
     try {
-      worker.postMessage({ code, entryPoint, tests, markHidden });
+      worker.postMessage(payload);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       finish(
         buildErrorResult(
-          tests,
+          fallbackTests,
           'Error',
           `No se pudo enviar el código al ejecutor: ${message}`,
           markHidden
@@ -130,11 +117,67 @@ function runJavaScriptInWorker(
   });
 }
 
-/**
- * Quita los comentarios según el lenguaje y colapsa los espacios en blanco.
- * Cada lenguaje tiene sus propios comentarios: en Python `//` es división entera
- * y en C++ `#include` no es un comentario.
- */
+function runJavaScriptInWorker(
+  code: string,
+  entryPoint: string,
+  tests: TestCase[],
+  markHidden = false,
+  perf?: PerfInputPayload
+): Promise<ExecutionResult> {
+  if (typeof Worker === 'undefined') {
+    const res = executeJavaScript(code, entryPoint, tests, markHidden);
+    if (res.passed && perf) {
+      const perfOutcome = executePerformanceTest(code, entryPoint, perf);
+      res.perfPassed = perfOutcome.passed;
+      res.perfDurationMs = perfOutcome.durationMs;
+      if (!perfOutcome.passed) {
+        res.passed = false;
+        res.error = perfOutcome.error;
+      }
+    }
+    return Promise.resolve(res);
+  }
+
+  return runWorkerPayload({ mode: 'tests', code, entryPoint, tests, markHidden, perf }, tests, markHidden);
+}
+
+export function runCustomJavaScriptInWorker(
+  code: string,
+  entryPoint: string,
+  args: unknown[],
+  hasExpected: boolean,
+  expected: unknown,
+  inputDisplay: string
+): Promise<ExecutionResult> {
+  const customTestCase: TestCase[] = [
+    {
+      id: 'custom-1',
+      input: args,
+      expected,
+      inputDisplay,
+      expectedDisplay: hasExpected ? JSON.stringify(expected) : '(libre)',
+    },
+  ];
+
+  if (typeof Worker === 'undefined') {
+    return Promise.resolve(
+      executeCustomJavaScriptTest(code, entryPoint, args, hasExpected, expected, inputDisplay)
+    );
+  }
+
+  return runWorkerPayload(
+    {
+      mode: 'custom',
+      code,
+      entryPoint,
+      tests: customTestCase,
+      custom: { args, hasExpected, expected, inputDisplay },
+    },
+    customTestCase,
+    false
+  );
+}
+
 function normalizeWhitespace(input: string, language: Language): string {
   const withoutComments =
     language === 'python'
@@ -147,9 +190,6 @@ function compact(input: string): string {
   return input.replace(/\s+/g, '');
 }
 
-/**
- * Valida delimitadores básicos (paréntesis, corchetes, llaves y comillas sin cerrar).
- */
 export function checkBasicSyntax(code: string, language: Language): string | null {
   const stack: { char: string; line: number }[] = [];
   const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}' };
@@ -250,11 +290,6 @@ function extractIdentifiers(code: string): Set<string> {
   return new Set(tokens);
 }
 
-/**
- * Juez simulado para Python, Java y C++.
- * Verifica sintaxis básica, cambios respecto al código inicial y patrones estructurales
- * frente a la solución de referencia del desafío. No ejecuta código real.
- */
 export function evaluateSimulatedCode(
   code: string,
   language: Language,
@@ -316,7 +351,6 @@ export function evaluateSimulatedCode(
   const normalizedStarter = normalizeWhitespace(starter, language);
   const normalizedRef = normalizeWhitespace(reference, language);
 
-  // El código starter sin modificar siempre debe fallar
   if (normalizedUser === normalizedStarter) {
     const msg =
       challenge.category === 'debugging'
@@ -343,7 +377,6 @@ export function evaluateSimulatedCode(
     };
   }
 
-  // Verificar que exista el punto de entrada esperado
   if (!code.includes(challenge.entryPoint)) {
     const msg = `No se encontró el método/función "${challenge.entryPoint}".`;
     return {
@@ -367,7 +400,6 @@ export function evaluateSimulatedCode(
     };
   }
 
-  // Verificar patrones prohibidos (bugs conocidos en debugging o enfoque O(n²) en optimización)
   const forbidden = challenge.validationHints?.forbiddenSubstrings?.[language] ?? [];
   for (const bad of forbidden) {
     if (normalizedUser.includes(bad)) {
@@ -394,7 +426,6 @@ export function evaluateSimulatedCode(
     }
   }
 
-  // Verificar que tenga sentencia return
   const hasReturn = /\breturn\b/.test(code);
   if (!hasReturn) {
     const msg = 'La función no devuelve ningún resultado (falta "return").';
@@ -419,11 +450,9 @@ export function evaluateSimulatedCode(
     };
   }
 
-  // Tokens obligatorios si el desafío define pistas estructurales
   const requiredTokens = challenge.validationHints?.requiredTokens?.[language] ?? [];
   const missingTokens = requiredTokens.filter((tok) => !normalizedUser.includes(tok));
 
-  // Comparar cobertura estructural frente a la solución de referencia
   const refTokens = extractIdentifiers(normalizedRef);
   const userTokens = extractIdentifiers(normalizedUser);
   let overlap = 0;
@@ -432,14 +461,11 @@ export function evaluateSimulatedCode(
   });
   const similarity = refTokens.size > 0 ? overlap / refTokens.size : 0;
 
-  // Debe tener suficiente cuerpo lógico (al menos una operación más allá de un stub)
   const hasControlOrLogic =
     /\b(for|while|if|switch|map|filter|reduce|sort|Set|Map|dict|set|unordered_map|HashMap|vector|Arrays|Math|len|size|length|split|join|append|push)\b/.test(
       code
     ) || normalizedUser === normalizedRef;
 
-  // Enfoques alternativos correctos y habituales (p. ej. `s[::-1]`, `StringBuilder.reverse()`),
-  // que difieren de la solución de referencia pero resuelven el desafío igual de bien.
   const acceptedIdioms = challenge.validationHints?.acceptedIdioms?.[language] ?? [];
   const compactUser = compact(normalizedUser);
   const idiomMatch = acceptedIdioms.some((idiom) => compactUser.includes(compact(idiom)));
@@ -507,13 +533,20 @@ export const judgeRunner: Runner = {
   async run(code, language, tests, challenge, markHidden = false): Promise<ExecutionResult> {
     try {
       if (language === 'javascript') {
-        return await runJavaScriptInWorker(code, challenge.entryPoint, tests, markHidden);
+        const perfPayload: PerfInputPayload | undefined =
+          markHidden && challenge.perf
+            ? {
+                sizeLabel: challenge.perf.sizeLabel,
+                args: challenge.perf.build(),
+                referenceCode: challenge.referenceSolution.javascript,
+                maxMs: challenge.perf.maxMs,
+              }
+            : undefined;
+        return await runJavaScriptInWorker(code, challenge.entryPoint, tests, markHidden, perfPayload);
       }
-      // Pequeño retardo realista (120ms) para el juez simulado
       await new Promise((resolve) => setTimeout(resolve, 120));
       return evaluateSimulatedCode(code, language, tests, challenge, markHidden);
     } catch (err) {
-      // Red de seguridad: ningún fallo del validador debe perderse en silencio.
       const message = err instanceof Error ? err.message : String(err);
       return {
         ...buildErrorResult(

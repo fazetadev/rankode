@@ -1,12 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Code2, Trophy, User, Award } from 'lucide-react';
+import { LayoutDashboard, Code2, Zap, Trophy, User } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, end: true },
   { to: '/challenges', label: 'Desafíos', icon: Code2, end: false },
+  { to: '/practice', label: 'Práctica', icon: Zap, end: true },
   { to: '/ranking', label: 'Ranking', icon: Trophy, end: true },
   { to: '/profile', label: 'Perfil', icon: User, end: true },
-  { to: '/ranks', label: 'Rangos', icon: Award, end: true },
 ];
 
 export function MobileNav() {

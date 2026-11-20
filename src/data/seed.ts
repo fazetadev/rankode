@@ -1,4 +1,13 @@
-import type { ActivityDay, Language, Submission, UserProfile } from '../types';
+import type {
+  ActivityDay,
+  AppSettings,
+  CustomTestCase,
+  Language,
+  LocalAccount,
+  NotificationItem,
+  Submission,
+  UserProfile,
+} from '../types';
 
 export interface SeedState {
   profile: UserProfile;
@@ -11,7 +20,52 @@ export interface SeedState {
   drafts: Record<string, string>;
   submissions: Submission[];
   activityMap: Record<string, ActivityDay>;
+  notes: Record<string, string>;
+  favorites: string[];
+  reviewLater: string[];
+  customTests: Record<string, CustomTestCase[]>;
+  revealedSolutions: string[];
+  splitRatio: number;
+  settings: AppSettings;
+  notifications: NotificationItem[];
+  practiceQuizXp: number;
+  isAuthenticated: boolean;
+  activeAccountId: string | null;
+  accounts: LocalAccount[];
+  accountSnapshots: Record<string, AccountProgressSnapshot>;
 }
+
+export interface AccountProgressSnapshot {
+  profile: UserProfile;
+  xp: number;
+  streakDays: number;
+  selectedLanguage: Language;
+  solvedChallengeIds: string[];
+  attemptedChallengeIds: string[];
+  unlockedHints: Record<string, number[]>;
+  drafts: Record<string, string>;
+  submissions: Submission[];
+  activityMap: Record<string, ActivityDay>;
+  notes: Record<string, string>;
+  favorites: string[];
+  reviewLater: string[];
+  customTests: Record<string, CustomTestCase[]>;
+  revealedSolutions: string[];
+  notifications: NotificationItem[];
+  practiceQuizXp: number;
+}
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  locale: 'es',
+  editor: {
+    fontSize: 13,
+    tabSize: 2,
+    lineWrapping: false,
+    autocompletion: true,
+    closeBrackets: true,
+    lineNumbers: true,
+  },
+};
 
 function isoDateDaysAgo(daysAgo: number): string {
   const d = new Date();
@@ -20,10 +74,46 @@ function isoDateDaysAgo(daysAgo: number): string {
 }
 
 /**
- * Estado inicial de demostración: el usuario comienza en Rookie con historial básico
- * para que las métricas, el mapa de actividad y la gráfica de XP sean legibles desde el primer segundo.
+ * Estado inicial limpio: todo usuario nuevo comienza completamente desde cero (0 XP, 0 desafíos, racha 0).
  */
-export function createInitialSeedState(): SeedState {
+export function createInitialSeedState(overrides?: Partial<UserProfile>): SeedState {
+  const today = new Date().toISOString();
+  return {
+    profile: {
+      username: overrides?.username ?? 'invitado',
+      email: overrides?.email ?? '',
+      country: overrides?.country ?? 'ES',
+      joinedAt: overrides?.joinedAt ?? today,
+    },
+    xp: 0,
+    streakDays: 0,
+    selectedLanguage: 'javascript',
+    solvedChallengeIds: [],
+    attemptedChallengeIds: [],
+    unlockedHints: {},
+    drafts: {},
+    submissions: [],
+    activityMap: {},
+    notes: {},
+    favorites: [],
+    reviewLater: [],
+    customTests: {},
+    revealedSolutions: [],
+    splitRatio: 44,
+    settings: DEFAULT_APP_SETTINGS,
+    notifications: [],
+    practiceQuizXp: 0,
+    isAuthenticated: false,
+    activeAccountId: null,
+    accounts: [],
+    accountSnapshots: {},
+  };
+}
+
+/**
+ * Estado opcional con actividad de muestra (útil solo si el usuario elige cargar datos de demo).
+ */
+export function createDemoSeedState(): SeedState {
   const today = isoDateDaysAgo(0);
   const yesterday = isoDateDaysAgo(1);
   const twoDaysAgo = isoDateDaysAgo(2);
@@ -87,19 +177,17 @@ export function createInitialSeedState(): SeedState {
   ];
 
   return {
-    profile: {
-      username: 'tu_usuario',
+    ...createInitialSeedState({
+      username: 'demo_user',
       country: 'ES',
       joinedAt: isoDateDaysAgo(70),
-    },
-    xp: 220, // Rookie (umbral Bronze = 500)
+    }),
+    xp: 220,
     streakDays: 3,
-    selectedLanguage: 'javascript',
     solvedChallengeIds: ['invertir-cadena', 'suma-dos-numeros'],
     attemptedChallengeIds: ['invertir-cadena', 'bug-off-by-one', 'suma-dos-numeros'],
-    unlockedHints: {},
-    drafts: {},
     submissions,
     activityMap,
+    isAuthenticated: true,
   };
 }

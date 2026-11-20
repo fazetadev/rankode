@@ -75,13 +75,11 @@ export const BASE_XP_BY_DIFFICULTY: Record<Difficulty, number> = {
 
 export const FIRST_TRY_BONUS_RATE = 0.1; // +10%
 export const DAILY_CHALLENGE_MULTIPLIER = 1.5; // x1.5 (+50%)
+export const COMPLEXITY_BONUS_RATE = 0.15; // +15% por alcanzar complejidad objetivo
 export const HINT_PENALTY_RATE = 0.1; // -10% por cada pista usada
 export const STREAK_BONUS_PER_DAY = 0.05; // +5% por día consecutivo
 export const STREAK_BONUS_MAX = 0.25; // Máximo +25% (5 días)
 
-/**
- * Devuelve el rango actual correspondiente al XP acumulado.
- */
 export function getRankForXp(xp: number): RankDefinition {
   const normalizedXp = Math.max(0, Math.floor(xp));
   let current = RANKS[0];
@@ -95,9 +93,6 @@ export function getRankForXp(xp: number): RankDefinition {
   return current;
 }
 
-/**
- * Devuelve el siguiente rango o null si el usuario alcanzó Legend.
- */
 export function getNextRank(xp: number): RankDefinition | null {
   const current = getRankForXp(xp);
   const idx = RANKS.findIndex((r) => r.id === current.id);
@@ -105,9 +100,6 @@ export function getNextRank(xp: number): RankDefinition | null {
   return RANKS[idx + 1];
 }
 
-/**
- * Calcula métricas de progreso hacia el siguiente rango.
- */
 export function getRankProgress(xp: number): {
   currentRank: RankDefinition;
   nextRank: RankDefinition | null;
@@ -146,9 +138,6 @@ export function getRankProgress(xp: number): {
   };
 }
 
-/**
- * Calcula la bonificación porcentual por racha diaria (+5%/día, tope +25%).
- */
 export function calculateStreakBonusRate(streakDays: number): number {
   const safeDays = Math.max(0, Math.floor(streakDays));
   return Number(Math.min(safeDays * STREAK_BONUS_PER_DAY, STREAK_BONUS_MAX).toFixed(2));
@@ -161,22 +150,25 @@ export interface CalculateXpParams {
   isDailyChallenge: boolean;
   hintsUsedCount: number;
   streakDays: number;
+  meetsComplexityBonus?: boolean;
+  solutionRevealed?: boolean;
 }
 
 /**
  * Calcula el desglose completo de XP ganado al resolver un desafío.
- * Repetir un desafío ya resuelto devuelve 0 XP.
+ * Repetir un desafío ya resuelto o haber revelado la solución oficial devuelve 0 XP.
  */
 export function calculateChallengeXp(params: CalculateXpParams): XpBreakdown {
-  if (params.alreadySolved) {
+  if (params.alreadySolved || params.solutionRevealed) {
     return {
       baseXp: 0,
       dailyBonus: 0,
       firstTryBonus: 0,
       streakBonus: 0,
+      complexityBonus: 0,
       hintPenalty: 0,
       total: 0,
-      alreadySolved: true,
+      alreadySolved: params.alreadySolved,
     };
   }
 
@@ -189,25 +181,29 @@ export function calculateChallengeXp(params: CalculateXpParams): XpBreakdown {
     : 0;
   const streakRate = calculateStreakBonusRate(params.streakDays);
   const streakBonus = Math.round(baseXp * streakRate);
+  const complexityBonus = params.meetsComplexityBonus
+    ? Math.round(baseXp * COMPLEXITY_BONUS_RATE)
+    : 0;
   const clampedHints = Math.max(0, Math.min(3, Math.floor(params.hintsUsedCount)));
   const hintPenalty = Math.round(baseXp * clampedHints * HINT_PENALTY_RATE);
 
-  const total = Math.max(0, baseXp + dailyBonus + firstTryBonus + streakBonus - hintPenalty);
+  const total = Math.max(
+    0,
+    baseXp + dailyBonus + firstTryBonus + streakBonus + complexityBonus - hintPenalty
+  );
 
   return {
     baseXp,
     dailyBonus,
     firstTryBonus,
     streakBonus,
+    complexityBonus,
     hintPenalty,
     total,
     alreadySolved: false,
   };
 }
 
-/**
- * Selecciona de forma determinista el desafío diario del día actual.
- */
 export function getDailyChallengeId(challengeIds: string[], date: Date = new Date()): string {
   if (challengeIds.length === 0) return '';
   const dayKey = `${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}`;

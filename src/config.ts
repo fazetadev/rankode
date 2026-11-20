@@ -1,13 +1,14 @@
 import type { Category, Difficulty, Language } from './types';
 
 /**
- * Nombre provisional de la plataforma.
- * Cambia esta única constante para renombrar toda la aplicación.
+ * Nombre oficial de la plataforma (siempre en minúsculas).
  */
-export const APP_NAME = 'Arena';
+export const APP_NAME = 'rankode';
+export const APP_TAGLINE = 'Plataforma minimalista de programación competitiva';
 
-export const STORAGE_KEY = 'arena_platform_state_v1';
-export const STORAGE_VERSION = 1;
+export const LEGACY_STORAGE_KEY = 'arena_platform_state_v1';
+export const STORAGE_KEY = 'rankode_state_v2';
+export const STORAGE_VERSION = 2;
 
 export const SUPPORTED_LANGUAGES: { id: Language; label: string; short: string; ext: string }[] = [
   { id: 'javascript', label: 'JavaScript', short: 'JS', ext: 'js' },

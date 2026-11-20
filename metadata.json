@@ -1,5 +1,5 @@
 {
-  "name": "Arena",
+  "name": "rankode",
   "description": "Plataforma minimalista de programación competitiva con desafíos de lógica, debugging, resolución de problemas y optimización.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

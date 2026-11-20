@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, Terminal, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Terminal, Clock, AlertTriangle, Gauge } from 'lucide-react';
 import { formatDurationMs } from '../../lib/format';
 import type { ExecutionResult } from '../../types';
 import { Badge } from '../ui/Badge';
@@ -11,7 +11,10 @@ interface TestResultsProps {
 export function TestResults({ result, isRunning }: TestResultsProps) {
   if (isRunning) {
     return (
-      <div className="rounded-lg border border-[#27272A] bg-[#111113] p-4">
+      <div
+        aria-live="polite"
+        className="rounded-lg border border-[#27272A] bg-[#111113] p-4"
+      >
         <div className="flex items-center gap-2.5 text-sm text-[#A1A1AA]">
           <span
             aria-hidden="true"
@@ -25,7 +28,10 @@ export function TestResults({ result, isRunning }: TestResultsProps) {
 
   if (!result) {
     return (
-      <div className="rounded-lg border border-[#27272A] bg-[#111113] p-4 text-xs text-[#A1A1AA]">
+      <div
+        aria-live="polite"
+        className="rounded-lg border border-[#27272A] bg-[#111113] p-4 text-xs text-[#A1A1AA]"
+      >
         Pulsa <strong className="font-medium text-[#FAFAFA]">Ejecutar</strong> (Ctrl/Cmd+Enter) para
         probar los casos visibles o <strong className="font-medium text-[#FAFAFA]">Enviar</strong>{' '}
         (Ctrl/Cmd+Shift+Enter) para validar la suite completa.
@@ -36,10 +42,11 @@ export function TestResults({ result, isRunning }: TestResultsProps) {
   return (
     <div
       data-testid="test-results-panel"
+      aria-live="polite"
       className="space-y-3 rounded-lg border border-[#27272A] bg-[#111113] p-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#27272A] pb-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {result.passed ? (
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-400">
               <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
@@ -55,6 +62,14 @@ export function TestResults({ result, isRunning }: TestResultsProps) {
           )}
           {result.simulated && (
             <Badge variant="warning">Ejecución simulada</Badge>
+          )}
+          {result.perfDurationMs !== undefined && (
+            <Badge variant={result.perfPassed ? 'success' : 'error'}>
+              <Gauge aria-hidden="true" className="h-3 w-3" />
+              <span>
+                Rendimiento: {formatDurationMs(result.perfDurationMs)}
+              </span>
+            </Badge>
           )}
         </div>
 
